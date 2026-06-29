@@ -1,0 +1,330 @@
+{
+  "info": {
+    "name": "Mobile App API - QR Scanner",
+    "description": "\ud83d\udcf1 MOBILE APP API - COMPLETE HDFC-STYLE SECURITY EXAMPLE\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n\ud83c\udfaf COMPLETE WORKING EXAMPLE (All Steps with Responses)\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nSTEP 1\ufe0f\u20e3: Login\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nPOST http://localhost:9000/api/v1/auth/login\n\nRequest:\n{\n  \"email\": \"reader@demo-bank.com\",\n  \"password\": \"reader123\"\n}\n\nResponse:\n{\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"role\": \"qr_reader\",\n  \"bank_public_key_pem\": \"-----BEGIN PUBLIC KEY-----\nMIICIjAN...\",\n  \"encrypted_enc_key\": \"y1UCljhGfrC9r6H9XTmRrDAbQ6G6HO...\",\n  \"signature\": \"2d8cb8ec7d16bb61f2c739d7472ccc704...\"\n}\n\n\ud83d\udcbe App stores in memory:\n  - token (for API calls)\n  - bank_public_key_pem (to verify signatures)\n  - encrypted_enc_key (decrypt with password)\n  - signature (verify before decrypting)\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nSTEP 2\ufe0f\u20e3: Verify Signature & Decrypt Master Key (Client-Side)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nClient-side JavaScript:\n\n// 1. Verify RSA-PSS signature\nconst publicKey = await crypto.subtle.importKey(\n  \"spki\",\n  pemToArrayBuffer(bank_public_key_pem),\n  { name: \"RSA-PSS\", hash: \"SHA-256\" },\n  false,\n  [\"verify\"]\n);\n\nconst signatureValid = await crypto.subtle.verify(\n  { name: \"RSA-PSS\", saltLength: 32 },\n  publicKey,\n  hexToArrayBuffer(signature),\n  new TextEncoder().encode(encrypted_enc_key)\n);\n\nif (!signatureValid) throw new Error(\"Invalid signature!\");\n\n// 2. Derive AES key from user password\nconst passwordHash = await crypto.subtle.digest(\n  \"SHA-256\",\n  new TextEncoder().encode(\"reader123\")\n);\n\nconst aesKey = await crypto.subtle.importKey(\n  \"raw\",\n  passwordHash,\n  { name: \"AES-GCM\" },\n  false,\n  [\"decrypt\"]\n);\n\n// 3. Decrypt encrypted_enc_key\nconst encryptedBuffer = base64urlToArrayBuffer(encrypted_enc_key);\nconst nonce = encryptedBuffer.slice(0, 12);\nconst ciphertext = encryptedBuffer.slice(12);\n\nconst decrypted = await crypto.subtle.decrypt(\n  { name: \"AES-GCM\", iv: nonce },\n  aesKey,\n  ciphertext\n);\n\nconst masterEncryptionKey = new TextDecoder().decode(decrypted);\n\n\ud83d\udcbe App stores master key in memory (NEVER to disk!)\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nSTEP 3\ufe0f\u20e3: User Scans Encrypted QR Code\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nQR Code contains:\n{\n  \"v\": \"2.0\",\n  \"data\": \"ZT-qd7Fc6BRd-CvBT7diT37Ri0rtSc26r2oNG8I3w_Q0rLSJ...\"\n}\n\nApp extracts: encrypted_payload = \"ZT-qd7Fc6BRd...\"\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nSTEP 4\ufe0f\u20e3: Call Server to Get Token (Server validates JWT only)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nGET http://localhost:9000/api/v1/app/scan/e3112bb8-3a38-492d?client_decrypt=true\nAuthorization: Bearer <token>\n\nResponse:\n{\n  \"qr_type\": \"encrypted\",\n  \"raw_encrypted_payload\": \"ZT-qd7Fc6BRd-CvBT7diT37Ri0rtSc26r2oNG8I3w_Q...\",\n  \"portal_url\": \"http://localhost:3000/verify?token=e3112bb8...\"\n}\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nSTEP 5\ufe0f\u20e3: Decrypt Payload Locally (Client-Side)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n// Derive per-QR AES key\nconst perQrKeyMaterial = masterEncryptionKey + portal_url;\nconst perQrKeyHash = await crypto.subtle.digest(\n  \"SHA-256\",\n  new TextEncoder().encode(perQrKeyMaterial)\n);\n\nconst perQrAesKey = await crypto.subtle.importKey(\n  \"raw\",\n  perQrKeyHash,\n  { name: \"AES-GCM\" },\n  false,\n  [\"decrypt\"]\n);\n\n// Decrypt raw_encrypted_payload\nconst encPayloadBuffer = base64urlToArrayBuffer(raw_encrypted_payload);\nconst payloadNonce = encPayloadBuffer.slice(0, 12);\nconst payloadCiphertext = encPayloadBuffer.slice(12);\n\nconst decryptedPayload = await crypto.subtle.decrypt(\n  { name: \"AES-GCM\", iv: payloadNonce },\n  perQrAesKey,\n  payloadCiphertext\n);\n\nconst verifyUrl = new TextDecoder().decode(decryptedPayload);\n// Result: \"http://localhost:3000/verify?token=e3112bb8...\"\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nSTEP 6\ufe0f\u20e3: Open Document in WebView\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nwebView.loadUrl(verifyUrl);\n\nUser sees: Beautiful formatted bank statement with:\n\u2705 Account details\n\u2705 Balance information\n\u2705 \"HMAC-SHA256 - Bank Server Signed\" badge\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n\ud83d\udd12 SECURITY FEATURES (HDFC-Style):\n\n\u2705 Password never sent to server (only hash used locally)\n\u2705 Master key encrypted with password (server can't decrypt)\n\u2705 RSA-PSS signature prevents tampering\n\u2705 Per-QR unique keys (can't replay attacks)\n\u2705 Keys stored in memory only (cleared on logout)\n\u2705 Client-side decryption (server never sees plaintext)\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n\ud83d\udcf1 TEST THIS IN POSTMAN:\n\n1. Run \"Login\" \u2192 Auto-saves token\n2. Run \"Scan QR - Client Decrypt\" \u2192 Get encrypted payload\n3. Use provided JavaScript to decrypt (run in browser console)\n4. Open verify URL \u2192 See document\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "central_base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "bank_base_url",
+      "value": "http://localhost:9000",
+      "type": "string"
+    },
+    {
+      "key": "central_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bank_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bank_api_key",
+      "value": "demo_api_key_qrverify_2024",
+      "type": "string"
+    },
+    {
+      "key": "bank_id",
+      "value": "4cd032ac-50c4-4078-895d-508a0f35afc1",
+      "type": "string"
+    },
+    {
+      "key": "super_admin_email",
+      "value": "admin@qrverify.com",
+      "type": "string"
+    },
+    {
+      "key": "super_admin_password",
+      "value": "admin123",
+      "type": "string"
+    },
+    {
+      "key": "bank_admin_email",
+      "value": "bankadmin@demo-bank.com",
+      "type": "string"
+    },
+    {
+      "key": "bank_admin_password",
+      "value": "admin123",
+      "type": "string"
+    },
+    {
+      "key": "creator_email",
+      "value": "creator@demo-bank.com",
+      "type": "string"
+    },
+    {
+      "key": "creator_password",
+      "value": "creator123",
+      "type": "string"
+    },
+    {
+      "key": "reader_email",
+      "value": "reader@demo-bank.com",
+      "type": "string"
+    },
+    {
+      "key": "reader_password",
+      "value": "reader123",
+      "type": "string"
+    },
+    {
+      "key": "qr_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "\ud83d\udcf1 Mobile App API",
+      "description": "\ud83d\udcf1 MOBILE APP DEVELOPERS \u2014 COMPLETE API REFERENCE\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n\ud83d\udd39 BASIC FLOW (4 endpoints - SUFFICIENT for most apps):\n   1. Login\n   2. Get Bank Public Key\n   3. Scan Standard QR (public)\n   4. Scan Encrypted QR (authenticated)\n\n\ud83d\udd10 ADVANCED PKI FLOW (2 additional endpoints - OPTIONAL):\n   5. Register Device (one-time, adds hardware security)\n   6. Decrypt QR with Device Signature (highest security)\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n\ud83d\udca1 CHOOSE YOUR SECURITY LEVEL:\n\n\ud83d\udcf1 Standard (endpoints 1-4):\n   - Password-based encryption\n   - RSA signature verification\n   - Good for most banks\n\n\ud83d\udd10 HDFC-style PKI (endpoints 1-6):\n   - Everything from Standard +\n   - Device certificate registration\n   - Mutual authentication\n   - Hardware-backed security\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nBase URLs:\n- Bank Server: http://localhost:9000\n\nAuth:\n- JWT tokens auto-saved to {{bank_token}}\n- Demo: reader@demo-bank.com / reader123\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501",
+      "item": [
+        {
+          "name": "Login (App User / Reader)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "  pm.collectionVariables.set('bank_token', json.token);",
+                  "  console.log('App token set. Role:', json.role);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "http://localhost:3000"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{reader_email}}\",\n  \"password\": \"{{reader_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{bank_base_url}}/api/v1/auth/login",
+              "host": [
+                "{{bank_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "App user / QR Reader login. Returns JWT token + role='qr_reader' + encrypted_enc_key + RSA-PSS signature.\n\nCRITICAL \u2014 the app MUST:\n1. Derive AES key: SHA256(password) \u2192 32 bytes\n2. Store encrypted_enc_key + signature + AES key IN MEMORY ONLY (never to disk)\n3. Clear password immediately after key derivation\n4. On every encrypted QR scan: verify RSA-PSS signature, then AES-GCM decrypt encrypted_enc_key \u2192 bank's master EncryptionKey\n\nThe encrypted_enc_key is AES-256-GCM encrypted (nonce-first format, base64url encoded).\nThe signature is RSA-4096 PSS (SHA-256, salt=32) over the raw base64 encrypted_enc_key string (no prefix, hex-encoded).\n\nAlso supports qr_creator role \u2014 they can scan encrypted QRs too."
+          }
+        },
+        {
+          "name": "Get Bank Public Key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bank_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{bank_base_url}}/api/v1/bank/public-key",
+              "host": [
+                "{{bank_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "public-key"
+              ]
+            },
+            "description": "AUTHENTICATED endpoint \u2014 requires JWT from login.\n\nReturns the bank's active RSA-4096 public key. Used to verify RSA-PSS signatures on encrypted_enc_key.\n\nResponse includes:\n- public_key_pem: PEM-encoded RSA public key (PKCS#8 SPKI)\n- key_hash: SHA-256 hex of the public key (for caching/tamper check)\n- key_id: UUID of this key entry\n- rotated_at: Timestamp when this key was activated\n\nCache by key_id \u2014 re-fetch when key_id changes (rotation).\n\nNote: The same public key is also returned inline in the scan response (bank_public_key_pem)."
+          },
+          "response": [
+            {
+              "name": "Public Key Response",
+              "originalRequest": {
+                "method": "GET"
+              },
+              "body": "{\n  \"public_key_pem\": \"-----BEGIN PUBLIC KEY-----\\nMIICIjANBgkqhkiG9w0BAQ...\\n-----END PUBLIC KEY-----\",\n  \"key_hash\": \"sha256-hex-of-key\",\n  \"key_id\": \"uuid-of-key\",\n  \"rotated_at\": \"2026-06-01T00:00:00Z\"\n}",
+              "code": 200
+            }
+          ]
+        },
+        {
+          "name": "Scan QR - Public Portal (Standard QR)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bank_base_url}}/portal/{{qr_token}}",
+              "host": [
+                "{{bank_base_url}}"
+              ],
+              "path": [
+                "portal",
+                "{{qr_token}}"
+              ]
+            },
+            "description": "PUBLIC endpoint \u2014 no auth required.\n\nCall this with the token extracted from the QR code.\n\nThe response includes:\n- qr_type: 'standard' or 'encrypted'\n- document: sanitized document fields (null for encrypted)\n- hmac_sig: HMAC-SHA256 signature of the document JSON\n\nVERIFICATION (app-side):\n1. Take the document JSON fields (sorted by key name: account_name, account_number, bank_name, branch_name, generation_note, prepared_by, prepared_for)\n2. JSON-marshal them canonically (sorted keys, no whitespace)\n3. Compute HMAC-SHA256 with the shared HMAC_SECRET\n4. Compare with hmac_sig \u2014 if they match, the data is authentic\n\nFor encrypted QRs, the app must use the authenticated scan endpoint instead."
+          },
+          "response": [
+            {
+              "name": "Portal Response (Standard)",
+              "originalRequest": {
+                "method": "GET"
+              },
+              "body": "{\n  \"qr_type\": \"standard\",\n  \"document\": {\n    \"bank_name\": \"Demo Bank\",\n    \"branch_name\": \"Main Branch\",\n    \"account_number\": \"ACC-123456\",\n    \"account_name\": \"John Doe\",\n    \"prepared_by\": \"Manager\",\n    \"prepared_for\": \"Audit Dept\",\n    \"generation_note\": \"Statement for Q1 2026\"\n  },\n  \"hmac_sig\": \"hex-encoded HMAC-SHA256\"\n}",
+              "code": 200
+            },
+            {
+              "name": "Portal Response (Encrypted)",
+              "originalRequest": {
+                "method": "GET"
+              },
+              "body": "{\n  \"qr_type\": \"encrypted\",\n  \"document\": null,\n  \"hmac_sig\": \"\",\n  \"message\": \"This document uses PKI encryption. Only authorized bank applications can view the contents.\"\n}\n\n// For encrypted QRs, the scanner app calls the authenticated scan endpoint instead.",
+              "code": 200
+            }
+          ]
+        },
+        {
+          "name": "Scan QR - Client Decrypt (Mobile App)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bank_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{bank_base_url}}/api/v1/app/scan/{{qr_token}}?client_decrypt=true",
+              "host": [
+                "{{bank_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "app",
+                "scan",
+                "{{qr_token}}"
+              ],
+              "query": [
+                {
+                  "key": "client_decrypt",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "\ud83d\udd10 SCAN ENCRYPTED QR - CLIENT-SIDE DECRYPTION\n\nThis endpoint returns the encrypted payload WITHOUT decrypting it.\nYour app decrypts it locally using the master key from login.\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nEXAMPLE RESPONSE:\n{\n  \"qr_type\": \"encrypted\",\n  \"raw_encrypted_payload\": \"ZT-qd7Fc6BRd-CvBT7diT37Ri0rtSc26r2oNG8I3w_Q...\",\n  \"portal_url\": \"http://localhost:3000/verify?token=e3112bb8...\"\n}\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nCLIENT-SIDE DECRYPTION CODE:\n\n// STEP 1: You already have from login:\nconst masterEncryptionKey = \"decrypted-from-encrypted_enc_key\";\nconst portal_url = \"http://localhost:3000/verify?token=...\";\n\n// STEP 2: Derive per-QR AES key\nconst perQrKeyMaterial = masterEncryptionKey + portal_url;\nconst perQrKeyHash = await crypto.subtle.digest(\n  \"SHA-256\",\n  new TextEncoder().encode(perQrKeyMaterial)\n);\n\nconst perQrAesKey = await crypto.subtle.importKey(\n  \"raw\",\n  perQrKeyHash,\n  { name: \"AES-GCM\" },\n  false,\n  [\"decrypt\"]\n);\n\n// STEP 3: Decrypt raw_encrypted_payload\nfunction base64urlToArrayBuffer(base64url) {\n  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');\n  const binary = atob(base64);\n  const bytes = new Uint8Array(binary.length);\n  for (let i = 0; i < binary.length; i++) {\n    bytes[i] = binary.charCodeAt(i);\n  }\n  return bytes.buffer;\n}\n\nconst encPayloadBuffer = base64urlToArrayBuffer(raw_encrypted_payload);\nconst payloadNonce = encPayloadBuffer.slice(0, 12);\nconst payloadCiphertext = encPayloadBuffer.slice(12);\n\nconst decryptedPayload = await crypto.subtle.decrypt(\n  { name: \"AES-GCM\", iv: payloadNonce },\n  perQrAesKey,\n  payloadCiphertext\n);\n\nconst verifyUrl = new TextDecoder().decode(decryptedPayload);\nconsole.log(\"Decrypted URL:\", verifyUrl);\n\n// STEP 4: Open in WebView\nwebView.loadUrl(verifyUrl);\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n\ud83d\udd12 SECURITY:\n- Server NEVER sees your decryption key\n- Each QR has unique per-QR key\n- Can't decrypt without user password\n- HDFC-level security\n\nTest this endpoint first, then use the code above to decrypt!"
+          },
+          "response": [
+            {
+              "name": "Scan Response (Client Decrypt)",
+              "originalRequest": {
+                "method": "GET"
+              },
+              "body": "{\n  \"qr_type\": \"encrypted\",\n  \"raw_encrypted_payload\": \"base64url-encoded-aes-gcm-ciphertext\",\n  \"portal_url\": \"http://localhost:9000/portal/abc123\",\n  \"digital_signature\": \"hex-encoded-rsa-pss-signature\",\n  \"key_id\": \"uuid-of-signing-key\",\n  \"bank_public_key_pem\": \"-----BEGIN PUBLIC KEY-----\\n...\\n-----END PUBLIC KEY-----\"\n}",
+              "code": 200
+            }
+          ]
+        },
+        {
+          "name": "\ud83d\udd10 Register Device (PKI)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bank_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "http://localhost:3000"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"android-{{$timestamp}}\",\n  \"device_public_key\": \"-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A...\\n-----END PUBLIC KEY-----\",\n  \"device_name\": \"Samsung Galaxy S24\",\n  \"platform\": \"android\",\n  \"app_version\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{bank_base_url}}/api/v1/app/register-certificate",
+              "host": [
+                "{{bank_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "app",
+                "register-certificate"
+              ]
+            },
+            "description": "\ud83d\udd10 OPTIONAL - PKI Device Registration (Higher Security)\n\nRegister device's RSA public key for mutual authentication.\n\n**When to use:**\n- For maximum security (like HDFC bank app)\n- Device generates RSA-2048 key pair\n- Server verifies device signature on each request\n\n**Flow:**\n1. App generates RSA key pair on first launch\n2. POST this endpoint with public key\n3. Server stores device certificate\n4. Future requests include X-Device-Signature header\n\n**Request:**\n```json\n{\n  \"device_id\": \"unique-device-id\",\n  \"device_public_key\": \"-----BEGIN PUBLIC KEY-----...\",\n  \"device_name\": \"Samsung Galaxy S24\",\n  \"platform\": \"android\",\n  \"app_version\": \"1.0.0\"\n}\n```\n\n**Response:**\n```json\n{\n  \"device_id\": \"uuid\",\n  \"status\": \"registered\",\n  \"expires_at\": \"2027-06-28T00:00:00Z\"\n}\n```\n\n**Note:** This is OPTIONAL. The password-based flow (4 endpoints above) works without device registration."
+          }
+        },
+        {
+          "name": "\ud83d\udd10 Decrypt QR (with Device Signature)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bank_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Device-Signature",
+                "value": "RSA-PSS-SHA256-signature-of-request-body"
+              },
+              {
+                "key": "X-Device-ID",
+                "value": "device-uuid-from-registration"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encrypted_payload\": \"ZT-qd7Fc6BRd-CvBT7diT37Ri0rtSc26r2oNG8I3w_Q...\"\n}"
+            },
+            "url": {
+              "raw": "{{bank_base_url}}/api/v1/app/decrypt-qr",
+              "host": [
+                "{{bank_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "app",
+                "decrypt-qr"
+              ]
+            },
+            "description": "\ud83d\udd10 OPTIONAL - PKI-verified Decryption (Highest Security)\n\nDecrypt QR with device signature verification (like HDFC).\n\n**When to use:**\n- When device certificate is registered\n- Adds hardware-backed security\n- Server verifies device signature\n\n**Headers:**\n- Authorization: JWT token\n- X-Device-Signature: RSA-PSS signature of request body\n- X-Device-ID: Device UUID from registration\n\n**Signature Calculation:**\n```javascript\n// Sign the JSON body with device private key\nconst message = JSON.stringify(body);\nconst signature = crypto.subtle.sign(\n  { name: \"RSA-PSS\", saltLength: 32 },\n  devicePrivateKey,\n  new TextEncoder().encode(message)\n);\nconst signatureHex = Array.from(new Uint8Array(signature))\n  .map(b => b.toString(16).padStart(2, '0')).join('');\n```\n\n**Response:**\n```json\n{\n  \"document\": { ... },\n  \"portal_url\": \"http://localhost:3000/verify?token=...\"\n}\n```\n\n**Note:** This is OPTIONAL. Use \"Scan QR - Client Decrypt\" endpoint for simpler flow without device registration."
+          }
+        }
+      ]
+    }
+  ]
+}
