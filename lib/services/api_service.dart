@@ -6,6 +6,7 @@ import '../config/api_config.dart';
 import '../models/device_registration.dart';
 import '../models/login_response.dart';
 import '../models/qr_scan_response.dart';
+import '../models/user_profile.dart';
 import 'crypto_service.dart';
 
 class ApiService {
@@ -152,6 +153,42 @@ class ApiService {
     }
 
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<UserProfile> getProfile({
+    required String token,
+    required String deviceId,
+    required String privateKeyPem,
+  }) async {
+    final method = 'GET';
+    final path = ApiConfig.profilePath;
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final signedData = '$method|$path|$timestamp|';
+
+    final signature = _crypto.signWithRsaPssBase64(
+      data: signedData,
+      privateKeyPem: privateKeyPem,
+    );
+
+    final headers = _headers(token: token);
+    headers['X-Signature'] = signature;
+    headers['X-Device-ID'] = deviceId;
+    headers['X-Timestamp'] = timestamp;
+
+    final response = await _client
+        .get(
+          Uri.parse('${ApiConfig.baseUrl}$path'),
+          headers: headers,
+        )
+        .timeout(ApiConfig.requestTimeout);
+
+    if (response.statusCode != 200) {
+      final body = jsonDecode(response.body);
+      throw ApiException(
+          body['error'] as String? ?? 'Failed to fetch profile');
+    }
+
+    return UserProfile.fromJson(jsonDecode(response.body));
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/result_screen.dart';
 import 'screens/scanner_screen.dart';
 
@@ -37,6 +38,7 @@ class DynamicQRApp extends StatelessWidget {
         '/login': (_) => const LoginScreen(),
         '/scanner': (_) => const ScannerScreen(),
         '/result': (_) => const ResultScreen(),
+        '/profile': (_) => const ProfileScreen(),
       },
     );
   }

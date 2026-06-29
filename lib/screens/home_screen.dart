@@ -26,12 +26,18 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          if (auth.isLoggedIn)
+          if (auth.isLoggedIn) ...[
+            IconButton(
+              icon: const Icon(Icons.person_rounded, color: Color(0xFF2D6A4F)),
+              tooltip: 'Profile',
+              onPressed: () => Navigator.pushNamed(context, '/profile'),
+            ),
             IconButton(
               icon: const Icon(Icons.logout_rounded, color: Color(0xFFE74C3C)),
+              tooltip: 'Logout',
               onPressed: () => _confirmLogout(context),
-            )
-          else
+            ),
+          ] else
             TextButton.icon(
               onPressed: () => Navigator.pushNamed(context, '/login'),
               icon: const Icon(Icons.login_rounded, color: Color(0xFF2D6A4F)),
